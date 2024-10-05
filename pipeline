@@ -1,0 +1,68 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_IMAGE_NAME = 'myhelloworld'  // Docker image name
+        DOCKER_TAG = 'latest'  // Docker tag
+        REPO_URL = 'https://github.com/raghuopsdev/myhelloworld.git'  // GitHub repository URL
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                script {
+                    // Checkout the Git repository
+                    git url: "${REPO_URL}", branch: 'main'
+                }
+            }
+        }
+
+        stage('Build WAR File') {
+            steps {
+                script {
+                    // Build the WAR file using Maven
+                    sh 'mvn clean package'
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    // Create a Dockerfile
+                    writeFile file: 'Dockerfile', text: '''
+                    FROM tomcat:9.0
+                    COPY target/HelloWorld-1.0-SNAPSHOT.war /usr/local/tomcat/webapps/
+                    '''
+                    // Build the Docker image
+                    sh "docker build -t ${DOCKER_IMAGE_NAME}:${DOCKER_TAG} ."
+                }
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                script {
+                    // Log in to Docker Hub
+                    // Make sure you have configured credentials in Jenkins
+                    sh "chmod +x ./docker_login.sh"
+                    
+                    // Execute the Docker login script with encrypted password
+                    sh "./docker_login.sh"
+                    
+                    // Push the Docker image to Docker Hub
+                    sh "docker push ${DOCKER_IMAGE_NAME}:${DOCKER_TAG}"
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Maven WAR file built and Docker image created and pushed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed!'
+        }
+    }
+}
